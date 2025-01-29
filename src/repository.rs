@@ -38,9 +38,12 @@ impl Repository {
                 }
             }
         }
+
+        self.projects.push(Project { id: 11, name: "test".to_owned() });
+        self.projects.push(Project { id: 11, name: "test 1".to_owned() });
     }
 
-    fn find_all(&self) -> &Vec<Project> {
+    pub fn find_all(&self) -> &Vec<Project> {
         &self.projects
     }
 

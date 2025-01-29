@@ -2,13 +2,13 @@ use std::io::Result;
 use app::App;
 
 pub mod app;
-pub mod tui;
+pub mod crossterm;
 pub mod ui;
 pub mod model;
 pub mod repository;
 
 fn main() -> Result<()> {
-    App::run("/tmp/timers-rs.json")?;
+    let _ = crossterm::run();
 
     Ok(())
 }
