@@ -5,7 +5,7 @@ use crossterm::{
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
-use ratatui::{prelude::{Backend, CrosstermBackend}, Terminal, TerminalOptions, Viewport};
+use ratatui::{prelude::{Backend, CrosstermBackend}, Terminal};
 
 use crate::{app::App, ui};
 
@@ -19,7 +19,7 @@ pub fn run() -> Result<()> {
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
 
-    let app = App::new("/tmp/timers-rs.json");
+    let app = App::new("/mnt/c/tmp/projects.json");
     let app_result = run_app(&mut terminal, app, Duration::from_millis(250));
 
     disable_raw_mode()?;
@@ -51,8 +51,10 @@ fn run_app<B: Backend>(
             if let Event::Key(key) = event::read()? {
                 if key.kind == KeyEventKind::Press {
                     match key.code {
-                        KeyCode::Up | KeyCode::Char('k') => app.on_up(),
-                        KeyCode::Down | KeyCode::Char('j') => app.on_down(),
+                        KeyCode::Up | KeyCode::Char('w') => app.on_up(),
+                        KeyCode::Down | KeyCode::Char('s') => app.on_down(),
+                        KeyCode::Left | KeyCode::Char('a') => app.on_left(),
+                        KeyCode::Right | KeyCode::Char('d') => app.on_right(),
                         KeyCode::Char(c) => app.on_key(c),
                         _ => {}
                     }

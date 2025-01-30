@@ -1,5 +1,4 @@
 use std::io::Result;
-use app::App;
 
 pub mod app;
 pub mod crossterm;
@@ -8,6 +7,7 @@ pub mod model;
 pub mod repository;
 
 fn main() -> Result<()> {
+    env_logger::init();
     let _ = crossterm::run();
 
     Ok(())

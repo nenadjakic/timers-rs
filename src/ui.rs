@@ -24,57 +24,120 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
     let chunks = Layout::horizontal(constraints).split(chunks[1]);
     let chunks =
         Layout::vertical([Constraint::Percentage(50), Constraint::Percentage(50)]).split(chunks[0]);
-
     draw_project_list(frame, app, chunks[0]);
     draw_text(frame, chunks[1]);
 }
+/*
+
+    let timer_buttons: Vec<Paragraph<'_>> = app
+        .timer_buttons
+        .items
+        .iter()
+        .map(|b| {
+            let selected = if b.selected { true } else { false };
+            let content = format!(
+                "{}{}{}",
+                if selected { "[" } else { "" },
+                b.text,
+                if selected { "]" } else { "" }
+            );
+            Paragraph::new(text::Line::from(Span::styled(
+                content,
+                Style::default().fg(Color::Green),
+            )))
+        })
+        .collect();
+
+    let timer_chunks = Layout::horizontal(
+        app.timer_buttons
+            .items
+            .iter()
+            .map(|_| Constraint::Length(10))
+            .collect::<Vec<_>>(),
+    )
+    .split(chunks[0]);
+
+    let mut i = 0;
+    timer_buttons.iter().for_each(|b| {
+
+        frame.render_widget(b, timer_chunks[i]);
+        i += 1;
+    });
+
+*/
 
 fn draw_header(frame: &mut Frame, app: &mut App, area: Rect) {
-    let elapsed = get_elapsed_time_since_midnight();
-
-    let time_text = format!("{}", elapsed);
-
-    let content_start = Paragraph::new(Text::from(Span::styled(
-        "▶ Start",
-        Style::default()
-            .add_modifier(Modifier::BOLD)
-            .fg(Color::Blue),
-    )));
-    let content_stop = Paragraph::new(Text::from(Span::styled(
-        "⏹ Stop",
-        Style::default()
-            .add_modifier(Modifier::BOLD)
-            .fg(Color::Blue),
-    )));
-    let content_time = Paragraph::new(Text::from(Span::styled(
-        format!("{}", time_text),
-        Style::default().add_modifier(Modifier::BOLD).fg(Color::Red),
-    )))
-    .alignment(Alignment::Right);
-
     let block = Block::default().borders(Borders::ALL);
     frame.render_widget(block, area);
-    let chunks = Layout::vertical([Constraint::Length(2), Constraint::Min(2)]).split(area);
 
+    let chunks = Layout::vertical([Constraint::Length(2), Constraint::Min(2)]).split(area);
     let chunks = Layout::horizontal([
         Constraint::Length(1),
-        Constraint::Length(8),
-        Constraint::Length(8),
+        Constraint::Fill(2),
         Constraint::Fill(1),
+        Constraint::Length(20),
         Constraint::Length(1),
     ])
     .split(chunks[1]);
 
-    frame.render_widget(content_start, chunks[1]);
-    frame.render_widget(content_stop, chunks[2]);
+    let timer_chunks = Layout::horizontal(
+        app.timer_buttons
+            .items
+            .iter()
+            .map(|_| Constraint::Length(10))
+            .collect::<Vec<_>>(),
+    )
+    .split(chunks[2]);
+
+    let selected_button_index = app.timer_buttons.state.selected().unwrap_or(9999);
+
+    app.timer_buttons
+        .items
+        .iter()
+        .enumerate()
+        .for_each(|(i, b)| {
+            let selected = i == selected_button_index;
+            let content = format!(
+                "{}{}{}",
+                if selected { "[ " } else { "  " },
+                b.text,
+                if selected { " ]" } else { "  " }
+            );
+            let paragraph = Paragraph::new(text::Line::from(Span::styled(
+                content,
+                Style::default().fg(Color::Green),
+            )))
+            .alignment(Alignment::Right);
+            frame.render_widget(paragraph, timer_chunks[i]);
+        });
+    let selected_project_name = app
+        .projects
+        .selected()
+        .map(|project| project.name.clone())
+        .unwrap_or("No project selected".to_owned());
+
+    let content_project = Paragraph::new(Text::from(Span::styled(
+        selected_project_name,
+        Style::default()
+            .add_modifier(Modifier::BOLD)
+            .fg(Color::Green),
+    )));
+
+    let time_text = get_elapsed_time_since_midnight();
+
+    let content_time = Paragraph::new(Text::from(Span::styled(
+         time_text.to_string(),
+        Style::default().add_modifier(Modifier::BOLD).fg(Color::Red),
+    )))
+    .alignment(Alignment::Right);
+
+    frame.render_widget(content_project, chunks[1]);
     frame.render_widget(content_time, chunks[3]);
 }
 
 pub fn draw_project_list(frame: &mut Frame, app: &mut App, area: Rect) {
     let constraints = vec![Constraint::Percentage(50), Constraint::Percentage(50)];
     let chunks = Layout::horizontal(constraints).split(area);
-    let chunks =
-        Layout::vertical([Constraint::Percentage(50), Constraint::Percentage(50)]).split(chunks[0]);
 
     let projects: Vec<ListItem> = app
         .projects
@@ -86,7 +149,7 @@ pub fn draw_project_list(frame: &mut Frame, app: &mut App, area: Rect) {
     let projects = List::new(projects)
         .block(Block::bordered().title("Projects"))
         .highlight_style(Style::default().add_modifier(Modifier::BOLD))
-        .highlight_symbol(">> ");
+        .highlight_symbol("> ");
 
     frame.render_stateful_widget(projects, chunks[0], &mut app.projects.state);
 }
