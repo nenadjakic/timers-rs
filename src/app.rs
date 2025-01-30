@@ -58,19 +58,24 @@ impl<T> StatefulList<T> {
 
 pub struct ButtonState<'a> {
     pub text: &'a str,
-    pub selected: bool,
 }
 
 impl<'a> ButtonState<'a> {
-    pub const fn new(text: &'a str, selected: bool) -> Self {
-        Self { text, selected }
+    pub const fn new(text: &'a str) -> Self {
+        Self { text }
     }
 }
+
+pub const TIMER_BUTTONS_PANEL_INDEX: usize = 0;
+pub const PROJECT_LIST_PANEL_INDEX: usize = 1;
+pub const TIMER_LIST_PANEL_INDEX: usize = 2;
+pub const PROJECT_INPUT_PANEL_INDEX: usize = 3;
 
 pub struct App {
     pub should_quit: bool,
     pub projects: StatefulList<Project>,
     pub timer_buttons: StatefulList<ButtonState<'static>>,
+    pub selected_panel_index: usize,
     repository: Repository,
 }
 
@@ -81,19 +86,25 @@ impl App {
             should_quit: false,
             projects: StatefulList::with_items(repository.find_all().to_vec()),
             timer_buttons: StatefulList::with_items(vec![
-                ButtonState::new("Start", true),
-                ButtonState::new("Stop", false),
+                ButtonState::new("New project"),
+                ButtonState::new("Start"),
+                ButtonState::new("Stop"),
             ]),
+            selected_panel_index: 0,
             repository,
         }
     }
 
     pub fn on_left(&mut self) {
-        self.timer_buttons.previous();
+        if self.selected_panel_index == TIMER_BUTTONS_PANEL_INDEX {
+            self.timer_buttons.previous();
+        }
     }
 
     pub fn on_right(&mut self) {
-        self.timer_buttons.next();
+        if self.selected_panel_index == TIMER_BUTTONS_PANEL_INDEX {
+            self.timer_buttons.next();
+        }
     }
 
     pub fn on_up(&mut self) {
@@ -102,6 +113,14 @@ impl App {
 
     pub fn on_down(&mut self) {
         self.projects.next();
+    }
+
+    pub fn on_tab(&mut self) {
+        if self.selected_panel_index == 5 {
+            self.selected_panel_index = 0;
+        } else {
+            self.selected_panel_index += 1;
+        }
     }
 
     pub fn on_key(&mut self, c: char) {

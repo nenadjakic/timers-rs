@@ -11,6 +11,8 @@ use crate::{app::App, ui};
 
 
 pub fn run() -> Result<()> {
+    install_panic_hook();
+
     enable_raw_mode()?;
     let mut stdout = std::io::stdout();
 
@@ -55,6 +57,7 @@ fn run_app<B: Backend>(
                         KeyCode::Down | KeyCode::Char('s') => app.on_down(),
                         KeyCode::Left | KeyCode::Char('a') => app.on_left(),
                         KeyCode::Right | KeyCode::Char('d') => app.on_right(),
+                        KeyCode::Tab => app.on_tab(),
                         KeyCode::Char(c) => app.on_key(c),
                         _ => {}
                     }
@@ -66,4 +69,15 @@ fn run_app<B: Backend>(
             return Ok(());
         }
     }
+}
+
+fn install_panic_hook() {
+    better_panic::install();
+    let original_hook = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |info| {
+        disable_raw_mode().unwrap();
+        execute!(io::stdout(), LeaveAlternateScreen).unwrap();
+        original_hook(info);
+        std::process::exit(1);
+    }));
 }

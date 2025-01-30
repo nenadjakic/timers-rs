@@ -2,13 +2,13 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use ratatui::{
     layout::{Alignment, Constraint, Layout, Rect},
-    style::{Color, Modifier, Style},
+    style::{Color, Modifier, Style, Stylize},
     text::{self, Span, Text},
-    widgets::{Block, Borders, List, ListItem, Paragraph, Wrap},
+    widgets::{Block, BorderType, Borders, List, ListItem, Paragraph, Wrap},
     Frame,
 };
 
-use crate::app::App;
+use crate::app::{App, PROJECT_INPUT_PANEL_INDEX, PROJECT_LIST_PANEL_INDEX, TIMER_BUTTONS_PANEL_INDEX, TIMER_LIST_PANEL_INDEX};
 
 pub fn render(frame: &mut Frame) {
     let text = Text::raw("Work in progress!");
@@ -16,58 +16,25 @@ pub fn render(frame: &mut Frame) {
 }
 
 pub fn draw(frame: &mut Frame, app: &mut App) {
-    let chunks = Layout::vertical([Constraint::Length(3), Constraint::Min(0)]).split(frame.area());
+    let chunks = Layout::vertical([
+        Constraint::Length(3),
+        Constraint::Fill(1),
+        Constraint::Length(25),
+    ])
+    .split(frame.area());
 
-    draw_header(frame, app, chunks[0]);
-
-    let constraints = vec![Constraint::Percentage(50), Constraint::Percentage(50)];
-    let chunks = Layout::horizontal(constraints).split(chunks[1]);
-    let chunks =
-        Layout::vertical([Constraint::Percentage(50), Constraint::Percentage(50)]).split(chunks[0]);
-    draw_project_list(frame, app, chunks[0]);
-    draw_text(frame, chunks[1]);
+    draw_header(frame, app, chunks[0], TIMER_BUTTONS_PANEL_INDEX);
+    draw_content(frame, app, chunks[1]);
+    draw_text(frame, chunks[2]);
 }
-/*
 
-    let timer_buttons: Vec<Paragraph<'_>> = app
-        .timer_buttons
-        .items
-        .iter()
-        .map(|b| {
-            let selected = if b.selected { true } else { false };
-            let content = format!(
-                "{}{}{}",
-                if selected { "[" } else { "" },
-                b.text,
-                if selected { "]" } else { "" }
-            );
-            Paragraph::new(text::Line::from(Span::styled(
-                content,
-                Style::default().fg(Color::Green),
-            )))
-        })
-        .collect();
+fn draw_header(frame: &mut Frame, app: &mut App, area: Rect, panel_index: usize) {
+    let (border_color, border_type) = get_border_styles(app.selected_panel_index == panel_index);
 
-    let timer_chunks = Layout::horizontal(
-        app.timer_buttons
-            .items
-            .iter()
-            .map(|_| Constraint::Length(10))
-            .collect::<Vec<_>>(),
-    )
-    .split(chunks[0]);
-
-    let mut i = 0;
-    timer_buttons.iter().for_each(|b| {
-
-        frame.render_widget(b, timer_chunks[i]);
-        i += 1;
-    });
-
-*/
-
-fn draw_header(frame: &mut Frame, app: &mut App, area: Rect) {
-    let block = Block::default().borders(Borders::ALL);
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .border_type(border_type)
+        .border_style(Style::default().fg(border_color));
     frame.render_widget(block, area);
 
     let chunks = Layout::vertical([Constraint::Length(2), Constraint::Min(2)]).split(area);
@@ -84,13 +51,12 @@ fn draw_header(frame: &mut Frame, app: &mut App, area: Rect) {
         app.timer_buttons
             .items
             .iter()
-            .map(|_| Constraint::Length(10))
+            .map(|_| Constraint::Length(15))
             .collect::<Vec<_>>(),
     )
     .split(chunks[2]);
 
     let selected_button_index = app.timer_buttons.state.selected().unwrap_or(9999);
-
     app.timer_buttons
         .items
         .iter()
@@ -126,7 +92,7 @@ fn draw_header(frame: &mut Frame, app: &mut App, area: Rect) {
     let time_text = get_elapsed_time_since_midnight();
 
     let content_time = Paragraph::new(Text::from(Span::styled(
-         time_text.to_string(),
+        time_text.to_string(),
         Style::default().add_modifier(Modifier::BOLD).fg(Color::Red),
     )))
     .alignment(Alignment::Right);
@@ -135,9 +101,20 @@ fn draw_header(frame: &mut Frame, app: &mut App, area: Rect) {
     frame.render_widget(content_time, chunks[3]);
 }
 
-pub fn draw_project_list(frame: &mut Frame, app: &mut App, area: Rect) {
+fn draw_content(frame: &mut Frame, app: &mut App, area: Rect) {
     let constraints = vec![Constraint::Percentage(50), Constraint::Percentage(50)];
     let chunks = Layout::horizontal(constraints).split(area);
+    draw_timer_list(frame, app, chunks[1], TIMER_LIST_PANEL_INDEX);
+
+    let chunks =
+        Layout::vertical(vec![Constraint::Fill(1), Constraint::Length(10)]).split(chunks[0]);
+
+    draw_project_list(frame, app, chunks[0], PROJECT_LIST_PANEL_INDEX);
+    draw_project_input(frame, app, chunks[1], PROJECT_INPUT_PANEL_INDEX);
+}
+
+fn draw_project_list(frame: &mut Frame, app: &mut App, area: Rect, panel_index: usize) {
+    let (border_color, border_type) = get_border_styles(app.selected_panel_index == panel_index);
 
     let projects: Vec<ListItem> = app
         .projects
@@ -147,11 +124,39 @@ pub fn draw_project_list(frame: &mut Frame, app: &mut App, area: Rect) {
         .collect();
 
     let projects = List::new(projects)
-        .block(Block::bordered().title("Projects"))
+        .block(
+            Block::bordered()
+                .title("Projects")
+                .border_type(border_type)
+                .border_style(Style::default().fg(border_color)),
+        )
         .highlight_style(Style::default().add_modifier(Modifier::BOLD))
         .highlight_symbol("> ");
 
-    frame.render_stateful_widget(projects, chunks[0], &mut app.projects.state);
+    frame.render_stateful_widget(projects, area, &mut app.projects.state);
+}
+
+fn draw_timer_list(frame: &mut Frame, app: &mut App, area: Rect, panel_index: usize) {
+    let (border_color, border_type) = get_border_styles(app.selected_panel_index == panel_index);
+
+    let block = Block::default()
+        .title("TIMER LIST")
+        .borders(Borders::ALL)
+        .border_type(border_type)
+        .border_style(Style::default().fg(border_color));
+
+    frame.render_widget(block, area);
+}
+fn draw_project_input(frame: &mut Frame, app: &mut App, area: Rect, panel_index: usize) {
+    let (border_color, border_type) = get_border_styles(app.selected_panel_index == panel_index);
+
+    let block = Block::default()
+        .title("INPUT_PROJECT")
+        .borders(Borders::ALL)
+        .border_type(border_type)
+        .border_style(Style::default().fg(border_color));
+
+    frame.render_widget(block, area);
 }
 
 fn draw_text(frame: &mut Frame, area: Rect) {
@@ -186,4 +191,14 @@ fn get_elapsed_time_since_midnight() -> String {
     let minutes = (elapsed % 3600) / 60;
     let seconds = elapsed % 60;
     format!("{:02}:{:02}:{:02}", hours, minutes, seconds)
+}
+
+fn get_border_styles(selected: bool) -> (Color, BorderType) {
+    let mut border_color = Color::White;
+    let mut border_type = BorderType::Plain;
+    if selected {
+        border_color = Color::Magenta;
+        border_type = BorderType::Thick;
+    }
+    (border_color, border_type)
 }
