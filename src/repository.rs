@@ -29,8 +29,7 @@ impl Repository {
 
     fn load_projects_from_file(&mut self) {
         let path = Path::new(&self.file_name);
-
-        if path.exists() {
+        if path.exists() {       
             if let Ok(data) = fs::read_to_string(path) {
                 if let Ok(parsed) = serde_json::from_str::<ProjectsData>(&data) {
                     self.projects = parsed.projects;
@@ -41,6 +40,8 @@ impl Repository {
 
         self.projects.push(Project { id: 11, name: "test".to_owned() });
         self.projects.push(Project { id: 11, name: "test 1".to_owned() });
+
+       // self.save();
     }
 
     pub fn find_all(&self) -> &Vec<Project> {
@@ -52,5 +53,20 @@ impl Repository {
             .iter()
             .filter(|p| self.favorites.contains(&p.id))
             .collect()
+    }
+
+    pub fn save(&self) {
+        let data = ProjectsData {
+            projects: self.projects.clone(),
+            favorites: self.favorites.clone(),
+        };
+
+        if let Ok(json) = serde_json::to_string(&data) {
+            if let Err(e) = fs::write(&self.file_name, json) {
+                eprintln!("Failed to write to file: {}", e);
+            }
+        } else {
+            eprintln!("Failed to serialize data");
+        }
     }
 }
