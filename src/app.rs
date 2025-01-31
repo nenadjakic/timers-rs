@@ -2,7 +2,7 @@
 use ratatui::widgets::ListState;
 
 use crate::{
-    model::project::Project,
+    model::{project::Project, timer::Timer},
     repository::Repository,
 };
 
@@ -94,7 +94,7 @@ impl App {
             repository,
         }
     }
-
+ 
     pub fn on_left(&mut self) {
         if self.selected_panel_index == TIMER_BUTTONS_PANEL_INDEX {
             self.timer_buttons.previous();
@@ -108,15 +108,19 @@ impl App {
     }
 
     pub fn on_up(&mut self) {
-        self.projects.previous();
+        if self.selected_panel_index == PROJECT_LIST_PANEL_INDEX {
+            self.projects.previous();
+        }
     }
 
     pub fn on_down(&mut self) {
-        self.projects.next();
+        if self.selected_panel_index == PROJECT_LIST_PANEL_INDEX {
+            self.projects.next();
+        }
     }
 
     pub fn on_tab(&mut self) {
-        if self.selected_panel_index == 5 {
+        if self.selected_panel_index == 3 {
             self.selected_panel_index = 0;
         } else {
             self.selected_panel_index += 1;

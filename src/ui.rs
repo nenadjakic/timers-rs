@@ -1,14 +1,18 @@
 use std::time::{SystemTime, UNIX_EPOCH};
 
+use chrono::{DateTime, NaiveDateTime};
 use ratatui::{
     layout::{Alignment, Constraint, Layout, Rect},
-    style::{Color, Modifier, Style, Stylize},
+    style::{Color, Modifier, Style},
     text::{self, Span, Text},
     widgets::{Block, BorderType, Borders, List, ListItem, Paragraph, Wrap},
     Frame,
 };
 
-use crate::app::{App, PROJECT_INPUT_PANEL_INDEX, PROJECT_LIST_PANEL_INDEX, TIMER_BUTTONS_PANEL_INDEX, TIMER_LIST_PANEL_INDEX};
+use crate::app::{
+    App, StatefulList, PROJECT_INPUT_PANEL_INDEX, PROJECT_LIST_PANEL_INDEX,
+    TIMER_BUTTONS_PANEL_INDEX, TIMER_LIST_PANEL_INDEX,
+};
 
 pub fn render(frame: &mut Frame) {
     let text = Text::raw("Work in progress!");
@@ -139,14 +143,46 @@ fn draw_project_list(frame: &mut Frame, app: &mut App, area: Rect, panel_index: 
 fn draw_timer_list(frame: &mut Frame, app: &mut App, area: Rect, panel_index: usize) {
     let (border_color, border_type) = get_border_styles(app.selected_panel_index == panel_index);
 
-    let block = Block::default()
-        .title("TIMER LIST")
-        .borders(Borders::ALL)
-        .border_type(border_type)
-        .border_style(Style::default().fg(border_color));
+    let selected_project = app.projects.selected();
 
-    frame.render_widget(block, area);
+    if let Some(project) = selected_project {
+        let timers = StatefulList::with_items(project.timers.clone());
+
+        let timers: Vec<ListItem> = timers
+            .items
+            .iter()
+            .map(|timer| {
+                let start_time = format!("Start: {}", get_formated_date_time(Some(timer.start_time)));
+                let end_time = format!("End: {}", get_formated_date_time(timer.end_time));
+                let duration = format!("Duration: {}", get_duration(timer.start_time, timer.end_time));
+
+                let timer_content = format!("{} | {} | {}", start_time, end_time, duration);
+                ListItem::new(vec![text::Line::from(Span::raw(timer_content))])
+            })
+            .collect();
+
+        let timers = List::new(timers)
+            .block(
+                Block::bordered()
+                    .title("Timers")
+                    .border_type(border_type)
+                    .border_style(Style::default().fg(border_color)),
+            )
+            .highlight_style(Style::default().add_modifier(Modifier::BOLD))
+            .highlight_symbol("> ");
+
+        frame.render_widget(timers, area);
+    } else {
+        let block = Block::default()
+            .title("TIMER LIST")
+            .borders(Borders::ALL)
+            .border_type(border_type)
+            .border_style(Style::default().fg(border_color));
+
+        frame.render_widget(block, area);
+    }
 }
+
 fn draw_project_input(frame: &mut Frame, app: &mut App, area: Rect, panel_index: usize) {
     let (border_color, border_type) = get_border_styles(app.selected_panel_index == panel_index);
 
@@ -192,10 +228,36 @@ fn get_elapsed_time_since_midnight() -> String {
     let seconds = elapsed % 60;
     format!("{:02}:{:02}:{:02}", hours, minutes, seconds)
 }
+fn get_formated_date_time(timestamp: Option<u64>) -> String {
+    if let Some(timestamp) = timestamp {
+        let naive_datetime =
+            DateTime::from_timestamp(timestamp as i64, 0).expect("Invalid timestamp");
+
+        naive_datetime.format("%Y-%m-%d %H:%M:%S").to_string()
+    } else {
+        String::new()
+    }
+}
+
+fn get_duration(start: u64, end: Option<u64>) -> String {
+    let end_time = end.unwrap_or_else(|| {
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("Time went backwards")
+            .as_secs()
+    });
+
+    let duration_secs = end_time - start;
+    let hours = duration_secs / 3600;
+    let minutes = (duration_secs % 3600) / 60;
+    let seconds = duration_secs % 60;
+
+    format!("{:02}:{:02}:{:02}", hours, minutes, seconds)
+}
 
 fn get_border_styles(selected: bool) -> (Color, BorderType) {
-    let mut border_color = Color::White;
-    let mut border_type = BorderType::Plain;
+    let mut border_color = Color::default();
+    let mut border_type = BorderType::default();
     if selected {
         border_color = Color::Magenta;
         border_type = BorderType::Thick;

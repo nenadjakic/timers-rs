@@ -2,7 +2,7 @@ use std::{fs, path::Path};
 
 use serde::{Deserialize, Serialize};
 
-use crate::model::project::Project;
+use crate::model::{project::Project, timer::{self, Timer}};
 
 pub struct Repository {
     file_name: String,
@@ -37,11 +37,16 @@ impl Repository {
                 }
             }
         }
+        /* 
+        let mut timers: Vec<Timer> = Vec::new();
+        timers.push(Timer {id: 1, start_time: 1738343885, end_time: Some(1738343885) });
 
-        self.projects.push(Project { id: 11, name: "test".to_owned() });
-        self.projects.push(Project { id: 11, name: "test 1".to_owned() });
+        self.projects.push(Project { id: 11, name: "test".to_owned(), timers: timers.clone() });
+        timers.push(Timer {id: 1, start_time: 1738343885, end_time: None });
+        self.projects.push(Project { id: 11, name: "test 1".to_owned(), timers: timers.clone() });
 
-       // self.save();
+        self.save();
+        */
     }
 
     pub fn find_all(&self) -> &Vec<Project> {
