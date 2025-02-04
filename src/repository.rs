@@ -37,16 +37,6 @@ impl Repository {
                 }
             }
         }
-        /* 
-        let mut timers: Vec<Timer> = Vec::new();
-        timers.push(Timer {id: 1, start_time: 1738343885, end_time: Some(1738343885) });
-
-        self.projects.push(Project { id: 11, name: "test".to_owned(), timers: timers.clone() });
-        timers.push(Timer {id: 1, start_time: 1738343885, end_time: None });
-        self.projects.push(Project { id: 11, name: "test 1".to_owned(), timers: timers.clone() });
-
-        self.save();
-        */
     }
 
     pub fn find_all(&self) -> &Vec<Project> {

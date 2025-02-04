@@ -1,8 +1,9 @@
-
+use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
 use ratatui::widgets::ListState;
+use tui_input::{backend::crossterm::EventHandler, Input};
 
 use crate::{
-    model::{project::Project, timer::Timer},
+    model::project::Project,
     repository::Repository,
 };
 
@@ -53,7 +54,6 @@ impl<T> StatefulList<T> {
             None => None,
         }
     }
-
 }
 
 pub struct ButtonState<'a> {
@@ -71,11 +71,41 @@ pub const PROJECT_LIST_PANEL_INDEX: usize = 1;
 pub const TIMER_LIST_PANEL_INDEX: usize = 2;
 pub const PROJECT_INPUT_PANEL_INDEX: usize = 3;
 
+#[derive(PartialEq)]
+pub enum InputMode {
+    Normal,
+    Editing,
+}
+
+pub struct InputComponent {
+    pub input: Input,
+    pub mode: InputMode,
+}
+
+impl Default for InputComponent {
+    fn default() -> Self {
+        Self {
+            input: Input::default(),
+            mode: InputMode::Normal,
+        }
+    }
+}
+
+impl InputComponent {
+    pub fn new(value: String, input_mode: InputMode) -> Self {
+        Self {
+            input: Input::new(value),
+            mode: input_mode,
+        }
+    }
+}
+
 pub struct App {
     pub should_quit: bool,
     pub projects: StatefulList<Project>,
     pub timer_buttons: StatefulList<ButtonState<'static>>,
     pub selected_panel_index: usize,
+    pub project_input: InputComponent,
     repository: Repository,
 }
 
@@ -91,10 +121,11 @@ impl App {
                 ButtonState::new("Stop"),
             ]),
             selected_panel_index: 0,
+            project_input: InputComponent::default(),
             repository,
         }
     }
- 
+
     pub fn on_left(&mut self) {
         if self.selected_panel_index == TIMER_BUTTONS_PANEL_INDEX {
             self.timer_buttons.previous();
@@ -110,12 +141,18 @@ impl App {
     pub fn on_up(&mut self) {
         if self.selected_panel_index == PROJECT_LIST_PANEL_INDEX {
             self.projects.previous();
+            if let Some(selected_project) = self.projects.selected() {
+                self.project_input = InputComponent::new(selected_project.name.clone(), InputMode::Normal);
+            }
         }
     }
 
     pub fn on_down(&mut self) {
         if self.selected_panel_index == PROJECT_LIST_PANEL_INDEX {
             self.projects.next();
+            if let Some(selected_project) = self.projects.selected() {
+                self.project_input = InputComponent::new(selected_project.name.clone(), InputMode::Normal);
+            }
         }
     }
 
@@ -127,12 +164,27 @@ impl App {
         }
     }
 
-    pub fn on_key(&mut self, c: char) {
-        match c {
-            'q' => {
-                self.should_quit = true;
-            }
-            _ => {}
-        }
+    pub fn on_key(&mut self, c: char, key_modifier: KeyModifiers) {
+        if key_modifier == KeyModifiers::CONTROL && c == 'q' {
+            self.should_quit = true;
+        } else {
+            match c {
+                'e' => {
+                    if self.selected_panel_index == PROJECT_LIST_PANEL_INDEX && self.projects.selected().is_some() {
+                        self.selected_panel_index = PROJECT_INPUT_PANEL_INDEX;
+                        self.project_input.mode = InputMode::Editing;
+                    }
+                }
+                _ => {
+                    if self.project_input.mode == InputMode::Editing {
+                        self.project_input.input.handle_event(&Event::Key(char_to_key_event(c)));
+                    }
+                }
+            }       
+        } 
     }
+}
+
+fn char_to_key_event(c: char) -> KeyEvent {
+    KeyEvent::new(KeyCode::Char(c), KeyModifiers::NONE)
 }

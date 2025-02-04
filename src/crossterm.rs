@@ -1,13 +1,13 @@
 use std::{io::{self, Result}, time::{Duration, Instant}};
 
 use crossterm::{
-    event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEventKind},
+    event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers},
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
 use ratatui::{prelude::{Backend, CrosstermBackend}, Terminal};
 
-use crate::{app::App, ui};
+use crate::{app::{App, InputMode, PROJECT_INPUT_PANEL_INDEX, PROJECT_LIST_PANEL_INDEX}, ui};
 
 
 pub fn run() -> Result<()> {
@@ -50,16 +50,19 @@ fn run_app<B: Backend>(
 
         let timeout = tick_rate.saturating_sub(last_tick.elapsed());
         if event::poll(timeout)? {
-            if let Event::Key(key) = event::read()? {
-                if key.kind == KeyEventKind::Press {
-                    match key.code {
+            if let Event::Key(key_event) = event::read()? {
+                if key_event.kind == KeyEventKind::Press {
+                    let modifier = key_event.modifiers;
+                    match key_event.code {
                         KeyCode::Up | KeyCode::Char('w') => app.on_up(),
                         KeyCode::Down | KeyCode::Char('s') => app.on_down(),
                         KeyCode::Left | KeyCode::Char('a') => app.on_left(),
                         KeyCode::Right | KeyCode::Char('d') => app.on_right(),
                         KeyCode::Tab => app.on_tab(),
-                        KeyCode::Char(c) => app.on_key(c),
-                        _ => {}
+                        KeyCode::Char(c) => app.on_key(c, modifier),
+                        _ => {
+
+                        }
                     }
                 }
             }

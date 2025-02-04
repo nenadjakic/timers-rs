@@ -1,16 +1,16 @@
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use chrono::{DateTime, NaiveDateTime};
+use chrono::DateTime;
 use ratatui::{
     layout::{Alignment, Constraint, Layout, Rect},
     style::{Color, Modifier, Style},
-    text::{self, Span, Text},
+    text::{self, Line, Span, Text},
     widgets::{Block, BorderType, Borders, List, ListItem, Paragraph, Wrap},
     Frame,
 };
 
 use crate::app::{
-    App, StatefulList, PROJECT_INPUT_PANEL_INDEX, PROJECT_LIST_PANEL_INDEX,
+    App, InputMode, StatefulList, PROJECT_INPUT_PANEL_INDEX, PROJECT_LIST_PANEL_INDEX,
     TIMER_BUTTONS_PANEL_INDEX, TIMER_LIST_PANEL_INDEX,
 };
 
@@ -29,7 +29,7 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
 
     draw_header(frame, app, chunks[0], TIMER_BUTTONS_PANEL_INDEX);
     draw_content(frame, app, chunks[1]);
-    draw_text(frame, chunks[2]);
+    draw_text(frame, app, chunks[2]);
 }
 
 fn draw_header(frame: &mut Frame, app: &mut App, area: Rect, panel_index: usize) {
@@ -111,7 +111,7 @@ fn draw_content(frame: &mut Frame, app: &mut App, area: Rect) {
     draw_timer_list(frame, app, chunks[1], TIMER_LIST_PANEL_INDEX);
 
     let chunks =
-        Layout::vertical(vec![Constraint::Fill(1), Constraint::Length(10)]).split(chunks[0]);
+        Layout::vertical(vec![Constraint::Fill(1), Constraint::Length(5)]).split(chunks[0]);
 
     draw_project_list(frame, app, chunks[0], PROJECT_LIST_PANEL_INDEX);
     draw_project_input(frame, app, chunks[1], PROJECT_INPUT_PANEL_INDEX);
@@ -152,12 +152,21 @@ fn draw_timer_list(frame: &mut Frame, app: &mut App, area: Rect, panel_index: us
             .items
             .iter()
             .map(|timer| {
-                let start_time = format!("Start: {}", get_formated_date_time(Some(timer.start_time)));
-                let end_time = format!("End: {}", get_formated_date_time(timer.end_time));
-                let duration = format!("Duration: {}", get_duration(timer.start_time, timer.end_time));
+                let start_time = get_formated_date_time(Some(timer.start_time));
+                let end_time = get_formated_date_time(timer.end_time);
+                let duration = get_duration(timer.start_time, timer.end_time);
 
-                let timer_content = format!("{} | {} | {}", start_time, end_time, duration);
-                ListItem::new(vec![text::Line::from(Span::raw(timer_content))])
+                ListItem::new(vec![
+                    text::Line::from(Span::styled(
+                        format!("{} - {}", start_time, end_time),
+                        Style::default().fg(Color::Green),
+                    )),
+                    text::Line::from(Span::styled(
+                        format!("Duration: {}", duration),
+                        Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
+                    )),
+                    text::Line::from(Span::raw("")),
+                ])
             })
             .collect();
 
@@ -186,28 +195,66 @@ fn draw_timer_list(frame: &mut Frame, app: &mut App, area: Rect, panel_index: us
 fn draw_project_input(frame: &mut Frame, app: &mut App, area: Rect, panel_index: usize) {
     let (border_color, border_type) = get_border_styles(app.selected_panel_index == panel_index);
 
-    let block = Block::default()
-        .title("INPUT_PROJECT")
-        .borders(Borders::ALL)
-        .border_type(border_type)
-        .border_style(Style::default().fg(border_color));
+    let width = area.width.max(3) - 3;
+    let scroll = app.project_input.input.visual_scroll(width as usize);
 
-    frame.render_widget(block, area);
+    let input = Paragraph::new(app.project_input.input.value())
+        .style(match app.project_input.mode {
+            InputMode::Normal => Style::default(),
+            InputMode::Editing => Style::default().fg(Color::Yellow),
+        })
+        .scroll((0, scroll as u16))
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .title("Edit project")
+                .border_type(border_type)
+                .border_style(Style::default().fg(border_color)),
+        );
+    frame.render_widget(input, area);
+ 
+    match app.project_input.mode {
+        InputMode::Normal =>           
+            {}
+
+        InputMode::Editing => {
+            frame.set_cursor_position((
+                area.x
+                    + ((app.project_input.input.visual_cursor()).max(scroll) - scroll) as u16
+                    + 1,
+                area.y + 1,
+            ))
+        }
+    }
 }
 
-fn draw_text(frame: &mut Frame, area: Rect) {
-    let text = vec![
-        text::Line::from("TimerRS is a simple application for managing projects and tracking time spent on them. It allows users to:"),
-        text::Line::from(""),
-        text::Line::from(Span::styled("✅ Create and view projects", Style::default().fg(Color::Red))),
-        text::Line::from(Span::styled("✅ Start and stop timers for specific project", Style::default().fg(Color::Green))),
-        text::Line::from(Span::styled("✅ Maintain a list of favorite projects", Style::default().fg(Color::Green))),
-        text::Line::from(
-            "One more thing is that it should display unicode characters: 10€"
-        ),
-    ];
+const HELP_TEXT_TIMER_PANEL: [&str; 5] = [
+    "Start timer",
+    "To start timer select Start button with ← and → or with 'a' and 'd' keys and press ⏎ key to start timer.",
+    "Stop timer",
+    "To stop timer select Stop button with ← and → or with 'a' and 'd' keys and press ⏎ key to stop timer.",
+    "TODO"
+];
+
+const HELP_PROJECT_PANEL: [&str; 5] = [
+    "Select project",
+    "To select project use ↑ and ↓ keys or use 'a' and 'd' keys.",
+    "Edit project",
+    "Select project with above manual, and pres 'e' key to start editing project.",
+    "TODO"
+];
+
+fn draw_text(frame: &mut Frame, app: &mut App, area: Rect) {
+    let text: Vec<Line<'_>> = match app.selected_panel_index {
+        TIMER_BUTTONS_PANEL_INDEX => HELP_TEXT_TIMER_PANEL,            
+        _ => HELP_PROJECT_PANEL
+    }
+    .iter()
+            .map(|x| text::Line::from(x.to_string()))
+            .collect();
+
     let block = Block::bordered().title(Span::styled(
-        "Footer",
+        "Manual",
         Style::default()
             .fg(Color::Magenta)
             .add_modifier(Modifier::BOLD),
