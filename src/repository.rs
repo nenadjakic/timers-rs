@@ -1,8 +1,8 @@
-use std::{fs, path::Path};
+use std::{fmt::Error, fs, path::Path};
 
 use serde::{Deserialize, Serialize};
 
-use crate::model::{project::Project, timer::{self, Timer}};
+use crate::{error::{TimerError}, model::{project::Project, timer::{self, Timer}}};
 
 pub struct Repository {
     file_name: String,
@@ -48,6 +48,16 @@ impl Repository {
             .iter()
             .filter(|p| self.favorites.contains(&p.id))
             .collect()
+    }
+
+    pub fn delete_project(&mut self, project_id: u32) -> Result<bool, TimerError> {
+        if let Some(index) = self.projects.iter().position(|x| x.id == project_id) {
+            self.projects.remove(index);
+            self.save();
+            Ok(true)
+        } else {
+            Err(TimerError::new("Project id does not exists."))
+        }
     }
 
     pub fn save(&self) {

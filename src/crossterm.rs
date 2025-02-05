@@ -54,10 +54,10 @@ fn run_app<B: Backend>(
                 if key_event.kind == KeyEventKind::Press {
                     let modifier = key_event.modifiers;
                     match key_event.code {
-                        KeyCode::Up | KeyCode::Char('w') => app.on_up(),
-                        KeyCode::Down | KeyCode::Char('s') => app.on_down(),
-                        KeyCode::Left | KeyCode::Char('a') => app.on_left(),
-                        KeyCode::Right | KeyCode::Char('d') => app.on_right(),
+                        KeyCode::Up => app.on_up(),
+                        KeyCode::Down => app.on_down(),
+                        KeyCode::Left => app.on_left(),
+                        KeyCode::Right => app.on_right(),
                         KeyCode::Tab => app.on_tab(),
                         KeyCode::Char(c) => app.on_key(c, modifier),
                         _ => {
