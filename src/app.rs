@@ -1,4 +1,4 @@
-use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
+use crossterm::event::{Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 use ratatui::{
     text::{Line, Text},
     widgets::ListState,
@@ -73,7 +73,7 @@ impl<'a> ButtonState<'a> {
 pub const TIMER_BUTTONS_PANEL_INDEX: usize = 0;
 pub const PROJECT_LIST_PANEL_INDEX: usize = 1;
 pub const TIMER_LIST_PANEL_INDEX: usize = 2;
-pub const PROJECT_INPUT_PANEL_INDEX: usize = 3;
+pub const PROJECT_INPUT_PANEL_INDEX: usize = 1001;
 
 #[derive(PartialEq)]
 pub enum InputMode {
@@ -181,90 +181,123 @@ impl App {
     }
 
     pub fn on_tab(&mut self) {
-        if self.selected_panel_index == 3 {
+        if self.selected_panel_index == 2 {
             self.selected_panel_index = 0;
         } else {
             self.selected_panel_index += 1;
         }
     }
 
-    pub fn on_key(&mut self, c: char, key_modifiers: KeyModifiers) {
-        if self.confirm_dialog_component.confirm_popup.is_opened()
-            && self
-                .confirm_dialog_component
-                .confirm_popup
-                .handle(KeyEvent::new(KeyCode::Char(c), key_modifiers))
-        {
-            match c {
-                'y' => {
-                    let project_id = self.projects.selected().unwrap().id;
-                    self.delete_project(project_id);
-                    self.projects = StatefulList::with_items(self.repository.find_all().to_vec())
-                }
-                'n' => {
-                }
-                _ => {}
-            }
-            return;
-        }
+    pub fn on_key(&mut self, key_event: KeyEvent) {
+        if key_event.kind == KeyEventKind::Press {
+            if key_event.modifiers == KeyModifiers::CONTROL && key_event.code == KeyCode::Char('q')
+            {
+                self.should_quit = true;
+            } else {
+                match key_event.code {
+                    KeyCode::Up => self.on_up(),
+                    KeyCode::Down => self.on_down(),
+                    KeyCode::Left => self.on_left(),
+                    KeyCode::Right => self.on_right(),
+                    KeyCode::Tab => {                        
+                        if self.project_input.mode != InputMode::Editing {
+                            self.on_tab();
+                        }
+                    },
+                    c => {
+                        if self.confirm_dialog_component.confirm_popup.is_opened()
+                            && self
+                                .confirm_dialog_component
+                                .confirm_popup
+                                .handle(KeyEvent::new(key_event.code, key_event.modifiers))
+                            && c == KeyCode::Char('y')
+                        {
+                            let project_id = self.projects.selected().unwrap().id;
+                            self.delete_project(project_id);
+                            self.projects =
+                                StatefulList::with_items(self.repository.find_all().to_vec())
+                        } else if self.selected_panel_index == PROJECT_LIST_PANEL_INDEX {
+                            match c {
+                                KeyCode::Char('e') => {
+                                    if self.projects.selected().is_some() {
+                                        self.selected_panel_index = PROJECT_INPUT_PANEL_INDEX;
+                                        self.project_input.mode = InputMode::Editing;
+                                    }
+                                }
+                                KeyCode::Char('d') => {
+                                    if self.projects.selected().is_some() {
+                                        let project_name =
+                                            self.projects.selected().unwrap().name.clone();
 
-        if key_modifiers == KeyModifiers::CONTROL && c == 'q' {
-            self.should_quit = true;
-        } else {
-            match c {
-                'e' => {
-                    if self.selected_panel_index == PROJECT_LIST_PANEL_INDEX
-                        && self.projects.selected().is_some()
-                    {
-                        self.selected_panel_index = PROJECT_INPUT_PANEL_INDEX;
-                        self.project_input.mode = InputMode::Editing;
-                    }
-                }
-                'd' => {
-                    if self.selected_panel_index == PROJECT_LIST_PANEL_INDEX
-                        && self.projects.selected().is_some()
-                    {
-                        let project_name = self.projects.selected().unwrap().name.clone();
+                                        let x = ConfirmDialogState::default()
+                                            .modal(false)
+                                            .with_title("Delete project")
+                                            .with_text(Text::from(vec![
+                                                Line::from(format!(
+                                                    "Are you sure you want to delete project with name: {}?",
+                                                    project_name
+                                                )),
+                                                Line::from(""),
+                                            ]))
+                                            .with_yes_button(ButtonLabel::from("Yes").unwrap())
+                                            .with_no_button(ButtonLabel::from("No").unwrap())
+                                            .with_yes_button_selected(false)
+                                            .with_listener(Some(
+                                                self.confirm_dialog_component.popup_tx.clone(),
+                                            ));
 
-                        let x = ConfirmDialogState::default()
-                            .modal(false)
-                            .with_title("Delete project")
-                            .with_text(Text::from(vec![
-                                Line::from(format!(
-                                    "Are you sure you want to delete project with name: {}?",
-                                    project_name
-                                )),
-                                Line::from(""),
-                            ]))
-                            .with_yes_button(ButtonLabel::from("(Y)es").unwrap())
-                            .with_no_button(ButtonLabel::from("(N)o").unwrap())
-                            .with_yes_button_selected(false)
-                            .with_listener(Some(self.confirm_dialog_component.popup_tx.clone()));
-
-                        self.confirm_dialog_component.confirm_popup = x.open();
-                    }
-                    // prikaži modal yes-no i ako je yes obriši.
-                    // mora biti project panel selektiran
-                    // u slučaju error običan modal s porukom
-                }
-                _ => {
-                    if self.project_input.mode == InputMode::Editing {
-                        self.project_input
-                            .input
-                            .handle_event(&Event::Key(char_to_key_event(c)));
+                                        self.confirm_dialog_component.confirm_popup = x.open();
+                                    }
+                                },
+                                _ => {}
+                            }
+                        } else if self.selected_panel_index == PROJECT_INPUT_PANEL_INDEX {
+                            match key_event.code {
+                                KeyCode::Enter => {
+                                    let mut project = self.projects.selected().unwrap().clone();
+                                    let new_project_name = self.project_input.input.value().to_string();
+                                    project.name = new_project_name.clone();
+                                    self.edit_project(project);
+                                    self.project_input = InputComponent::new(new_project_name, InputMode::Normal);
+                                    self.selected_panel_index = PROJECT_LIST_PANEL_INDEX;
+                                    self.projects = StatefulList::with_items(self.repository.find_all().to_vec())
+                                },
+                                KeyCode::Esc => {
+                                    self.project_input.mode = InputMode::Normal;
+                                    if self.projects.selected().is_some() {
+                                        let project_name =
+                                            self.projects.selected().unwrap().name.clone();
+                                        self.project_input = InputComponent::new(project_name, InputMode::Normal);
+                                        self.selected_panel_index = PROJECT_LIST_PANEL_INDEX;
+                                    }
+                                }
+                                _ => {
+                                    if self.project_input.mode == InputMode::Editing {
+                                        self.project_input
+                                            .input
+                                            .handle_event(&Event::Key(key_event));
+                                    }
+                                }
+                            }
+                        }                        
                     }
                 }
             }
         }
     }
 
-    pub fn delete_project(&mut self, project_id: u32) {
+    pub fn delete_project(&mut self, project_id: u64) {
         if let Err(err) = self.repository.delete_project(project_id) {
             self.error = Some(err.details);
         }
     }
-}
 
+    pub fn edit_project(&mut self, project: Project) {
+        if let Err(err) = self.repository.edit_project(project) {
+            self.error = Some(err.details);
+        }
+    }
+}
 fn char_to_key_event(c: char) -> KeyEvent {
     KeyEvent::new(KeyCode::Char(c), KeyModifiers::NONE)
 }

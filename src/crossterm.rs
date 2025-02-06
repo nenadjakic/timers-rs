@@ -51,20 +51,7 @@ fn run_app<B: Backend>(
         let timeout = tick_rate.saturating_sub(last_tick.elapsed());
         if event::poll(timeout)? {
             if let Event::Key(key_event) = event::read()? {
-                if key_event.kind == KeyEventKind::Press {
-                    let modifier = key_event.modifiers;
-                    match key_event.code {
-                        KeyCode::Up => app.on_up(),
-                        KeyCode::Down => app.on_down(),
-                        KeyCode::Left => app.on_left(),
-                        KeyCode::Right => app.on_right(),
-                        KeyCode::Tab => app.on_tab(),
-                        KeyCode::Char(c) => app.on_key(c, modifier),
-                        _ => {
-
-                        }
-                    }
-                }
+                app.on_key(key_event);                
             }
         }
         
