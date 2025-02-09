@@ -1,19 +1,26 @@
-use std::{fs, path::Path};
+use std::{
+    fs,
+    path::Path,
+    time::{SystemTime, UNIX_EPOCH},
+};
 
 use serde::{Deserialize, Serialize};
 
-use crate::model::{project::Project, timer::{self, Timer}};
+use crate::{
+    error::TimerError,
+    model::project::Project,
+};
 
 pub struct Repository {
     file_name: String,
     projects: Vec<Project>,
-    favorites: Vec<u32>,
+    favorites: Vec<u64>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 struct ProjectsData {
     projects: Vec<Project>,
-    favorites: Vec<u32>,
+    favorites: Vec<u64>,
 }
 
 impl Repository {
@@ -29,7 +36,7 @@ impl Repository {
 
     fn load_projects_from_file(&mut self) {
         let path = Path::new(&self.file_name);
-        if path.exists() {       
+        if path.exists() {
             if let Ok(data) = fs::read_to_string(path) {
                 if let Ok(parsed) = serde_json::from_str::<ProjectsData>(&data) {
                     self.projects = parsed.projects;
@@ -49,6 +56,40 @@ impl Repository {
             .filter(|p| self.favorites.contains(&p.id))
             .collect()
     }
+
+    pub fn delete_project(&mut self, project_id: u64) -> Result<bool, TimerError> {
+        if let Some(index) = self.projects.iter().position(|x| x.id == project_id) {
+            self.projects.remove(index);
+            self.save();
+            Ok(true)
+        } else {
+            Err(TimerError::new("Project with given id does not exists."))
+        }
+    }
+
+    pub fn add_project(&mut self, project_name: String) -> Result<bool, TimerError> {
+        let project = Project {
+            id: SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_secs(),
+            name: project_name,
+            timers: Vec::new(),
+        };
+        self.projects.push(project);
+        self.save();
+        Ok(true)
+    }
+
+    pub fn edit_project(&mut self, project: Project) -> Result<bool, TimerError> {
+        if let Some(index) = self.projects.iter().position(|x| x.id == project.id) {
+            self.projects[index] = project;
+            self.save();
+            Ok(true)
+        } else {
+            Err(TimerError::new("Project with given id does not exists."))
+        }
+    } 
 
     pub fn save(&self) {
         let data = ProjectsData {

@@ -1,5 +1,9 @@
-use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
-use ratatui::widgets::ListState;
+use crossterm::event::{Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
+use ratatui::{
+    text::{Line, Text},
+    widgets::ListState,
+};
+use tui_confirm_dialog::{ButtonLabel, ConfirmDialogState, Listener};
 use tui_input::{backend::crossterm::EventHandler, Input};
 
 use crate::{
@@ -69,7 +73,7 @@ impl<'a> ButtonState<'a> {
 pub const TIMER_BUTTONS_PANEL_INDEX: usize = 0;
 pub const PROJECT_LIST_PANEL_INDEX: usize = 1;
 pub const TIMER_LIST_PANEL_INDEX: usize = 2;
-pub const PROJECT_INPUT_PANEL_INDEX: usize = 3;
+pub const PROJECT_INPUT_PANEL_INDEX: usize = 1001;
 
 #[derive(PartialEq)]
 pub enum InputMode {
@@ -100,18 +104,28 @@ impl InputComponent {
     }
 }
 
+pub struct ConfirmDialogComponent {
+    pub visible: bool,
+    pub close_status: Option<String>,
+    pub confirm_popup: ConfirmDialogState,
+    pub popup_tx: std::sync::mpsc::Sender<Listener>,
+    pub popup_rx: std::sync::mpsc::Receiver<Listener>,
+}
 pub struct App {
     pub should_quit: bool,
     pub projects: StatefulList<Project>,
     pub timer_buttons: StatefulList<ButtonState<'static>>,
     pub selected_panel_index: usize,
     pub project_input: InputComponent,
+    pub error: Option<String>,
+    pub confirm_dialog_component: ConfirmDialogComponent,
     repository: Repository,
 }
 
 impl App {
     pub fn new(file_name: &str) -> Self {
         let repository = Repository::new(file_name);
+        let (tx, rx) = std::sync::mpsc::channel();
         Self {
             should_quit: false,
             projects: StatefulList::with_items(repository.find_all().to_vec()),
@@ -122,6 +136,14 @@ impl App {
             ]),
             selected_panel_index: 0,
             project_input: InputComponent::default(),
+            error: None,
+            confirm_dialog_component: ConfirmDialogComponent {
+                visible: false,
+                confirm_popup: ConfirmDialogState::default(),
+                popup_tx: tx,
+                popup_rx: rx,
+                close_status: None,
+            },
             repository,
         }
     }
@@ -142,7 +164,8 @@ impl App {
         if self.selected_panel_index == PROJECT_LIST_PANEL_INDEX {
             self.projects.previous();
             if let Some(selected_project) = self.projects.selected() {
-                self.project_input = InputComponent::new(selected_project.name.clone(), InputMode::Normal);
+                self.project_input =
+                    InputComponent::new(selected_project.name.clone(), InputMode::Normal);
             }
         }
     }
@@ -151,40 +174,163 @@ impl App {
         if self.selected_panel_index == PROJECT_LIST_PANEL_INDEX {
             self.projects.next();
             if let Some(selected_project) = self.projects.selected() {
-                self.project_input = InputComponent::new(selected_project.name.clone(), InputMode::Normal);
+                self.project_input =
+                    InputComponent::new(selected_project.name.clone(), InputMode::Normal);
             }
         }
     }
 
     pub fn on_tab(&mut self) {
-        if self.selected_panel_index == 3 {
+        if self.selected_panel_index == 2 {
             self.selected_panel_index = 0;
         } else {
             self.selected_panel_index += 1;
         }
     }
 
-    pub fn on_key(&mut self, c: char, key_modifier: KeyModifiers) {
-        if key_modifier == KeyModifiers::CONTROL && c == 'q' {
-            self.should_quit = true;
-        } else {
-            match c {
-                'e' => {
-                    if self.selected_panel_index == PROJECT_LIST_PANEL_INDEX && self.projects.selected().is_some() {
-                        self.selected_panel_index = PROJECT_INPUT_PANEL_INDEX;
-                        self.project_input.mode = InputMode::Editing;
+    pub fn on_key(&mut self, key_event: KeyEvent) {
+        if key_event.kind == KeyEventKind::Press {
+            if key_event.modifiers == KeyModifiers::CONTROL && key_event.code == KeyCode::Char('q')
+            {
+                self.should_quit = true;
+            } else {
+                match key_event.code {
+                    KeyCode::Up => self.on_up(),
+                    KeyCode::Down => self.on_down(),
+                    KeyCode::Left => self.on_left(),
+                    KeyCode::Right => self.on_right(),
+                    KeyCode::Tab => {
+                        if self.project_input.mode != InputMode::Editing {
+                            self.on_tab();
+                        }
+                    }
+                    c => {
+                        if self.confirm_dialog_component.confirm_popup.is_opened()
+                            && self
+                                .confirm_dialog_component
+                                .confirm_popup
+                                .handle(KeyEvent::new(key_event.code, key_event.modifiers))
+                            && c == KeyCode::Char('y')
+                        {
+                            let project_id = self.projects.selected().unwrap().id;
+                            self.delete_project(project_id);
+                            self.projects =
+                                StatefulList::with_items(self.repository.find_all().to_vec())
+                        } else if self.selected_panel_index == PROJECT_LIST_PANEL_INDEX {
+                            match c {
+                                KeyCode::Char('e') => {
+                                    if self.projects.selected().is_some() {
+                                        self.selected_panel_index = PROJECT_INPUT_PANEL_INDEX;
+                                        self.project_input.mode = InputMode::Editing;
+                                    }
+                                }
+                                KeyCode::Char('d') => {
+                                    if self.projects.selected().is_some() {
+                                        let project_name =
+                                            self.projects.selected().unwrap().name.clone();
+
+                                        let x = ConfirmDialogState::default()
+                                            .modal(false)
+                                            .with_title("Delete project")
+                                            .with_text(Text::from(vec![
+                                                Line::from(format!(
+                                                    "Are you sure you want to delete project with name: {}?",
+                                                    project_name
+                                                )),
+                                                Line::from(""),
+                                            ]))
+                                            .with_yes_button(ButtonLabel::from("Yes").unwrap())
+                                            .with_no_button(ButtonLabel::from("No").unwrap())
+                                            .with_yes_button_selected(false)
+                                            .with_listener(Some(
+                                                self.confirm_dialog_component.popup_tx.clone(),
+                                            ));
+
+                                        self.confirm_dialog_component.confirm_popup = x.open();
+                                    }
+                                }
+                                _ => {}
+                            }
+                        } else if self.selected_panel_index == PROJECT_INPUT_PANEL_INDEX {
+                            match key_event.code {
+                                KeyCode::Enter => {
+                                    let new_project_name =
+                                        self.project_input.input.value().to_string();
+                                    if self.projects.selected().is_some() {
+                                        let mut project = self.projects.selected().unwrap().clone();
+                                        project.name = new_project_name.clone();
+                                        self.edit_project(project);
+                                    } else {
+                                        self.add_project(new_project_name.clone());
+                                    }
+                                    self.project_input =
+                                        InputComponent::new(new_project_name, InputMode::Normal);
+                                    self.selected_panel_index = PROJECT_LIST_PANEL_INDEX;
+                                    self.projects = StatefulList::with_items(
+                                        self.repository.find_all().to_vec(),
+                                    );
+                                }
+                                KeyCode::Esc => {
+                                    self.project_input.mode = InputMode::Normal;
+                                    if self.projects.selected().is_some() {
+                                        let project_name =
+                                            self.projects.selected().unwrap().name.clone();
+                                        self.project_input =
+                                            InputComponent::new(project_name, InputMode::Normal);
+                                        self.selected_panel_index = PROJECT_LIST_PANEL_INDEX;
+                                    }
+                                }
+                                _ => {
+                                    if self.project_input.mode == InputMode::Editing {
+                                        self.project_input
+                                            .input
+                                            .handle_event(&Event::Key(key_event));
+                                    }
+                                }
+                            }
+                        } else if self.selected_panel_index == TIMER_BUTTONS_PANEL_INDEX {
+                            match key_event.code {
+                                KeyCode::Enter => {
+                                    if self.timer_buttons.selected().is_some()
+                                        && self
+                                            .timer_buttons
+                                            .selected()
+                                            .unwrap()
+                                            .text
+                                            .eq("New project")
+                                    {
+                                        self.selected_panel_index = PROJECT_INPUT_PANEL_INDEX;
+                                        self.project_input =
+                                            InputComponent::new(String::new(), InputMode::Editing);
+                                    }
+                                }
+                                _ => {}
+                            }
+                        }
                     }
                 }
-                _ => {
-                    if self.project_input.mode == InputMode::Editing {
-                        self.project_input.input.handle_event(&Event::Key(char_to_key_event(c)));
-                    }
-                }
-            }       
-        } 
+            }
+        }
+    }
+
+    pub fn delete_project(&mut self, project_id: u64) {
+        if let Err(err) = self.repository.delete_project(project_id) {
+            self.error = Some(err.details);
+        }
+    }
+
+    pub fn edit_project(&mut self, project: Project) {
+        if let Err(err) = self.repository.edit_project(project) {
+            self.error = Some(err.details);
+        }
+    }
+
+    pub fn add_project(&mut self, project_name: String) {
+        if let Err(err) = self.repository.add_project(project_name) {
+            self.error = Some(err.details);
+        }
     }
 }
-
 fn char_to_key_event(c: char) -> KeyEvent {
     KeyEvent::new(KeyCode::Char(c), KeyModifiers::NONE)
 }

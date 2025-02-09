@@ -4,7 +4,7 @@ use super::timer::Timer;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Project {
-    pub id: u32,
+    pub id: u64,
     pub name: String,
     pub timers: Vec<Timer>,
 }

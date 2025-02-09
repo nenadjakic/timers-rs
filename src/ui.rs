@@ -3,11 +3,12 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use chrono::DateTime;
 use ratatui::{
     layout::{Alignment, Constraint, Layout, Rect},
-    style::{Color, Modifier, Style},
+    style::{Color, Modifier, Style, Stylize},
     text::{self, Line, Span, Text},
     widgets::{Block, BorderType, Borders, List, ListItem, Paragraph, Wrap},
     Frame,
 };
+use tui_confirm_dialog::ConfirmDialog;
 
 use crate::app::{
     App, InputMode, StatefulList, PROJECT_INPUT_PANEL_INDEX, PROJECT_LIST_PANEL_INDEX,
@@ -30,6 +31,16 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
     draw_header(frame, app, chunks[0], TIMER_BUTTONS_PANEL_INDEX);
     draw_content(frame, app, chunks[1]);
     draw_text(frame, app, chunks[2]);
+
+    if app.confirm_dialog_component.confirm_popup.is_opened() {
+		let popup = ConfirmDialog::default()
+			.borders(Borders::ALL)
+			.bg(Color::Black)
+			.border_type(BorderType::Rounded)
+			.button_style(Style::default())
+			.selected_button_style(Style::default().yellow().underlined().bold());
+		frame.render_stateful_widget(popup, frame.area(), &mut app.confirm_dialog_component.confirm_popup);
+	}
 }
 
 fn draw_header(frame: &mut Frame, app: &mut App, area: Rect, panel_index: usize) {
@@ -111,7 +122,7 @@ fn draw_content(frame: &mut Frame, app: &mut App, area: Rect) {
     draw_timer_list(frame, app, chunks[1], TIMER_LIST_PANEL_INDEX);
 
     let chunks =
-        Layout::vertical(vec![Constraint::Fill(1), Constraint::Length(5)]).split(chunks[0]);
+        Layout::vertical(vec![Constraint::Fill(1), Constraint::Length(3)]).split(chunks[0]);
 
     draw_project_list(frame, app, chunks[0], PROJECT_LIST_PANEL_INDEX);
     draw_project_input(frame, app, chunks[1], PROJECT_INPUT_PANEL_INDEX);
@@ -212,19 +223,14 @@ fn draw_project_input(frame: &mut Frame, app: &mut App, area: Rect, panel_index:
                 .border_style(Style::default().fg(border_color)),
         );
     frame.render_widget(input, area);
- 
-    match app.project_input.mode {
-        InputMode::Normal =>           
-            {}
 
-        InputMode::Editing => {
-            frame.set_cursor_position((
-                area.x
-                    + ((app.project_input.input.visual_cursor()).max(scroll) - scroll) as u16
-                    + 1,
-                area.y + 1,
-            ))
-        }
+    match app.project_input.mode {
+        InputMode::Normal => {}
+
+        InputMode::Editing => frame.set_cursor_position((
+            area.x + ((app.project_input.input.visual_cursor()).max(scroll) - scroll) as u16 + 1,
+            area.y + 1,
+        )),
     }
 }
 
@@ -241,17 +247,17 @@ const HELP_PROJECT_PANEL: [&str; 5] = [
     "To select project use ↑ and ↓ keys or use 'a' and 'd' keys.",
     "Edit project",
     "Select project with above manual, and pres 'e' key to start editing project.",
-    "TODO"
+    "TODO",
 ];
 
 fn draw_text(frame: &mut Frame, app: &mut App, area: Rect) {
     let text: Vec<Line<'_>> = match app.selected_panel_index {
-        TIMER_BUTTONS_PANEL_INDEX => HELP_TEXT_TIMER_PANEL,            
-        _ => HELP_PROJECT_PANEL
+        TIMER_BUTTONS_PANEL_INDEX => HELP_TEXT_TIMER_PANEL,
+        _ => HELP_PROJECT_PANEL,
     }
     .iter()
-            .map(|x| text::Line::from(x.to_string()))
-            .collect();
+    .map(|x| text::Line::from(x.to_string()))
+    .collect();
 
     let block = Block::bordered().title(Span::styled(
         "Manual",
