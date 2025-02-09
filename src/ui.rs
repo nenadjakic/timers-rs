@@ -8,7 +8,7 @@ use ratatui::{
     widgets::{Block, BorderType, Borders, List, ListItem, Paragraph, Wrap},
     Frame,
 };
-use tui_confirm_dialog::{ButtonLabel, ConfirmDialog, ConfirmDialogState};
+use tui_confirm_dialog::ConfirmDialog;
 
 use crate::app::{
     App, InputMode, StatefulList, PROJECT_INPUT_PANEL_INDEX, PROJECT_LIST_PANEL_INDEX,

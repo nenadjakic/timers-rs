@@ -8,7 +8,7 @@ use tui_input::{backend::crossterm::EventHandler, Input};
 
 use crate::{
     model::project::Project,
-    repository::{self, Repository},
+    repository::Repository,
 };
 
 pub struct StatefulList<T> {
@@ -199,11 +199,11 @@ impl App {
                     KeyCode::Down => self.on_down(),
                     KeyCode::Left => self.on_left(),
                     KeyCode::Right => self.on_right(),
-                    KeyCode::Tab => {                        
+                    KeyCode::Tab => {
                         if self.project_input.mode != InputMode::Editing {
                             self.on_tab();
                         }
-                    },
+                    }
                     c => {
                         if self.confirm_dialog_component.confirm_popup.is_opened()
                             && self
@@ -248,26 +248,35 @@ impl App {
 
                                         self.confirm_dialog_component.confirm_popup = x.open();
                                     }
-                                },
+                                }
                                 _ => {}
                             }
                         } else if self.selected_panel_index == PROJECT_INPUT_PANEL_INDEX {
                             match key_event.code {
                                 KeyCode::Enter => {
-                                    let mut project = self.projects.selected().unwrap().clone();
-                                    let new_project_name = self.project_input.input.value().to_string();
-                                    project.name = new_project_name.clone();
-                                    self.edit_project(project);
-                                    self.project_input = InputComponent::new(new_project_name, InputMode::Normal);
+                                    let new_project_name =
+                                        self.project_input.input.value().to_string();
+                                    if self.projects.selected().is_some() {
+                                        let mut project = self.projects.selected().unwrap().clone();
+                                        project.name = new_project_name.clone();
+                                        self.edit_project(project);
+                                    } else {
+                                        self.add_project(new_project_name.clone());
+                                    }
+                                    self.project_input =
+                                        InputComponent::new(new_project_name, InputMode::Normal);
                                     self.selected_panel_index = PROJECT_LIST_PANEL_INDEX;
-                                    self.projects = StatefulList::with_items(self.repository.find_all().to_vec())
-                                },
+                                    self.projects = StatefulList::with_items(
+                                        self.repository.find_all().to_vec(),
+                                    );
+                                }
                                 KeyCode::Esc => {
                                     self.project_input.mode = InputMode::Normal;
                                     if self.projects.selected().is_some() {
                                         let project_name =
                                             self.projects.selected().unwrap().name.clone();
-                                        self.project_input = InputComponent::new(project_name, InputMode::Normal);
+                                        self.project_input =
+                                            InputComponent::new(project_name, InputMode::Normal);
                                         self.selected_panel_index = PROJECT_LIST_PANEL_INDEX;
                                     }
                                 }
@@ -279,7 +288,25 @@ impl App {
                                     }
                                 }
                             }
-                        }                        
+                        } else if self.selected_panel_index == TIMER_BUTTONS_PANEL_INDEX {
+                            match key_event.code {
+                                KeyCode::Enter => {
+                                    if self.timer_buttons.selected().is_some()
+                                        && self
+                                            .timer_buttons
+                                            .selected()
+                                            .unwrap()
+                                            .text
+                                            .eq("New project")
+                                    {
+                                        self.selected_panel_index = PROJECT_INPUT_PANEL_INDEX;
+                                        self.project_input =
+                                            InputComponent::new(String::new(), InputMode::Editing);
+                                    }
+                                }
+                                _ => {}
+                            }
+                        }
                     }
                 }
             }
@@ -294,6 +321,12 @@ impl App {
 
     pub fn edit_project(&mut self, project: Project) {
         if let Err(err) = self.repository.edit_project(project) {
+            self.error = Some(err.details);
+        }
+    }
+
+    pub fn add_project(&mut self, project_name: String) {
+        if let Err(err) = self.repository.add_project(project_name) {
             self.error = Some(err.details);
         }
     }

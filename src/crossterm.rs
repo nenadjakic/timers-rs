@@ -1,13 +1,13 @@
 use std::{io::{self, Result}, time::{Duration, Instant}};
 
 use crossterm::{
-    event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers},
+    event::{self, DisableMouseCapture, EnableMouseCapture, Event},
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
 use ratatui::{prelude::{Backend, CrosstermBackend}, Terminal};
 
-use crate::{app::{App, InputMode, PROJECT_INPUT_PANEL_INDEX, PROJECT_LIST_PANEL_INDEX}, ui};
+use crate::{app::App, ui};
 
 
 pub fn run() -> Result<()> {

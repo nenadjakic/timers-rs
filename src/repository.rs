@@ -1,5 +1,4 @@
 use std::{
-    fmt::Error,
     fs,
     path::Path,
     time::{SystemTime, UNIX_EPOCH},
@@ -9,10 +8,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     error::TimerError,
-    model::{
-        project::{self, Project},
-        timer::{self, Timer},
-    },
+    model::project::Project,
 };
 
 pub struct Repository {
@@ -81,7 +77,7 @@ impl Repository {
             timers: Vec::new(),
         };
         self.projects.push(project);
-
+        self.save();
         Ok(true)
     }
 
