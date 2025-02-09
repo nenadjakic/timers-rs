@@ -32,7 +32,7 @@ cargo run --release
 ## Dependencies
 
 - **ratatui**: For building the terminal user interface.
-- **crossterm****: For handling terminal input and output.
+- **crossterm**: For handling terminal input and output.
 - **serde** and **serde_json**: For serializing and deserializing project data.
 - **chrono**: For handling date and time operations.
 
