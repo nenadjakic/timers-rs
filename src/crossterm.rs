@@ -7,10 +7,10 @@ use crossterm::{
 };
 use ratatui::{prelude::{Backend, CrosstermBackend}, Terminal};
 
-use crate::{app::App, ui};
+use crate::{app::App, settings::Settings, ui};
 
 
-pub fn run() -> Result<()> {
+pub fn run(settings: Settings) -> Result<()> {
     install_panic_hook();
 
     enable_raw_mode()?;
@@ -21,7 +21,7 @@ pub fn run() -> Result<()> {
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
 
-    let app = App::new("/mnt/c/tmp/projects.json");
+    let app = App::new(&settings.repository.file_path.clone());
     let app_result = run_app(&mut terminal, app, Duration::from_millis(250));
 
     disable_raw_mode()?;
